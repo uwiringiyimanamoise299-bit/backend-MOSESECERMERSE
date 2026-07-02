@@ -2,14 +2,18 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 async function initDatabase() {
+  const dbHost = process.env.DB_HOST || process.env.MYSQLHOST || 'localhost';
+  const isRemote = dbHost !== 'localhost' && dbHost !== '127.0.0.1';
   const connection = await mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
+    host: dbHost,
+    user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
+    password: process.env.DB_PASSWORD ?? process.env.MYSQLPASSWORD ?? '',
+    port: Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306),
     multipleStatements: true,
+    ssl: isRemote ? { rejectUnauthorized: false } : undefined,
   });
 
-  const dbName = process.env.DB_NAME || 'montana_shop';
+  const dbName = process.env.DB_NAME ?? process.env.MYSQLDATABASE ?? 'montana_shop';
 
   await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
   await connection.query(`USE \`${dbName}\``);
@@ -148,7 +152,4 @@ async function initDatabase() {
   console.log('Database initialized successfully');
 }
 
-initDatabase().catch((err) => {
-  console.error('Database init error:', err);
-  process.exit(1);
-});
+module.exports = initDatabase;

@@ -95,12 +95,36 @@ exports.getOrders = async (req, res) => {
     } else {
       orders = await query('SELECT o.*, u.name as userName, u.email as userEmail FROM orders o LEFT JOIN users u ON o.userId = u.id ORDER BY o.createdAt DESC');
     }
-    orders.forEach((o) => {
+    for (const o of orders) {
       try { o.items = JSON.parse(o.items); } catch { o.items = []; }
       try { o.shippingAddress = JSON.parse(o.shippingAddress); } catch { o.shippingAddress = {}; }
       if (o.userName) o.user = { name: o.userName, email: o.userEmail };
-    });
+      const payments = await query('SELECT * FROM payments WHERE orderId = ?', [o.id]);
+      if (payments.length > 0) {
+        o.payment = payments[0];
+      }
+    }
     res.json({ orders });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getOrderById = async (req, res) => {
+  try {
+    const orders = await query('SELECT o.*, u.name as userName, u.email as userEmail, u.phone as userPhone FROM orders o LEFT JOIN users u ON o.userId = u.id WHERE o.id = ?', [req.params.id]);
+    if (orders.length === 0) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+    const o = orders[0];
+    try { o.items = JSON.parse(o.items); } catch { o.items = []; }
+    try { o.shippingAddress = JSON.parse(o.shippingAddress); } catch { o.shippingAddress = {}; }
+    if (o.userName) o.user = { name: o.userName, email: o.userEmail, phone: o.userPhone };
+    const payments = await query('SELECT * FROM payments WHERE orderId = ?', [o.id]);
+    if (payments.length > 0) {
+      o.payment = payments[0];
+    }
+    res.json({ order: o });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -119,6 +143,70 @@ exports.updateOrderStatus = async (req, res) => {
     } else {
       res.json({ message: 'Order status updated' });
     }
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.confirmOrder = async (req, res) => {
+  try {
+    await query('UPDATE orders SET status = ? WHERE id = ?', ['processing', req.params.id]);
+    const payments = await query('SELECT * FROM payments WHERE orderId = ?', [req.params.id]);
+    if (payments.length > 0) {
+      await query('UPDATE payments SET status = ? WHERE orderId = ?', ['verified', req.params.id]);
+    }
+    const orders = await query('SELECT o.*, u.name as userName, u.email as userEmail FROM orders o LEFT JOIN users u ON o.userId = u.id WHERE o.id = ?', [req.params.id]);
+    if (orders.length > 0) {
+      const o = orders[0];
+      try { o.items = JSON.parse(o.items); } catch { o.items = []; }
+      try { o.shippingAddress = JSON.parse(o.shippingAddress); } catch { o.shippingAddress = {}; }
+      if (o.userName) o.user = { name: o.userName, email: o.userEmail };
+      const pay = await query('SELECT * FROM payments WHERE orderId = ?', [o.id]);
+      if (pay.length > 0) o.payment = pay[0];
+      res.json({ order: o, message: 'Order confirmed successfully' });
+    } else {
+      res.json({ message: 'Order confirmed' });
+    }
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.rejectOrder = async (req, res) => {
+  try {
+    await query('UPDATE orders SET status = ? WHERE id = ?', ['cancelled', req.params.id]);
+    const payments = await query('SELECT * FROM payments WHERE orderId = ?', [req.params.id]);
+    if (payments.length > 0) {
+      await query('UPDATE payments SET status = ? WHERE orderId = ?', ['rejected', req.params.id]);
+    }
+    const orders = await query('SELECT o.*, u.name as userName, u.email as userEmail FROM orders o LEFT JOIN users u ON o.userId = u.id WHERE o.id = ?', [req.params.id]);
+    if (orders.length > 0) {
+      const o = orders[0];
+      try { o.items = JSON.parse(o.items); } catch { o.items = []; }
+      try { o.shippingAddress = JSON.parse(o.shippingAddress); } catch { o.shippingAddress = {}; }
+      if (o.userName) o.user = { name: o.userName, email: o.userEmail };
+      const pay = await query('SELECT * FROM payments WHERE orderId = ?', [o.id]);
+      if (pay.length > 0) o.payment = pay[0];
+      res.json({ order: o, message: 'Order rejected' });
+    } else {
+      res.json({ message: 'Order rejected' });
+    }
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.getCustomerOrders = async (req, res) => {
+  try {
+    const orders = await query('SELECT o.*, u.name as userName, u.email as userEmail FROM orders o LEFT JOIN users u ON o.userId = u.id WHERE o.userId = ? ORDER BY o.createdAt DESC', [req.params.userId]);
+    for (const o of orders) {
+      try { o.items = JSON.parse(o.items); } catch { o.items = []; }
+      try { o.shippingAddress = JSON.parse(o.shippingAddress); } catch { o.shippingAddress = {}; }
+      if (o.userName) o.user = { name: o.userName, email: o.userEmail };
+      const payments = await query('SELECT * FROM payments WHERE orderId = ?', [o.id]);
+      if (payments.length > 0) o.payment = payments[0];
+    }
+    res.json({ orders });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
