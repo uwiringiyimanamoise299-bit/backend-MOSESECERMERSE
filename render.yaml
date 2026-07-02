@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: backend-MOSESSHOP
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DB_HOST
+        sync: false        # ← set this in Render dashboard
+      - key: DB_USER
+        sync: false        # ← set this in Render dashboard
+      - key: DB_PASSWORD
+        sync: false        # ← set this in Render dashboard
+      - key: DB_NAME
+        sync: false        # ← set this in Render dashboard
+      - key: DB_PORT
+        value: 3306
+      - key: FRONTEND_URL
+        sync: false        # ← set your frontend URL in Render dashboard
